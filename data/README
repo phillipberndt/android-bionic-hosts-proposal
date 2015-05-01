@@ -1,0 +1,6 @@
+The data is based on a ~10 minutes from boot log output with a 38518 lines /etc/hosts file, with
+
+ no-patch                    ->  an unpatched system and the original hosts file
+ no-patch-fixed-record-size  ->  an unpatched system but fixed record sizes in the hosts file
+ patched-fixed-records       ->  a patched system with fixed record sizes
+ patched-variable-records    ->  a patched system with variable record sizes

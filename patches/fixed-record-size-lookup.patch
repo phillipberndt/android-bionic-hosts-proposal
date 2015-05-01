@@ -1,0 +1,73 @@
+diff --git a/libc/dns/net/getaddrinfo.c b/libc/dns/net/getaddrinfo.c
+index 2612d6a..d249e35 100644
+--- a/libc/dns/net/getaddrinfo.c
++++ b/libc/dns/net/getaddrinfo.c
+@@ -112,6 +112,8 @@
+ #include <sys/system_properties.h>
+ #endif /* ANDROID_CHANGES */
+ 
++#define LFHFF_IDENTIFIER "#LFHFFv1\n"
++
+ typedef union sockaddr_union {
+     struct sockaddr     generic;
+     struct sockaddr_in  in;
+@@ -2042,6 +2044,8 @@ _gethtent(FILE **hostf, const char *name, const struct addrinfo *pai)
+ 	const char *addr;
+ 	char hostbuf[8*1024];
+ 
++	int never_again = 0;
++
+ //	fprintf(stderr, "_gethtent() name = '%s'\n", name);
+ 	assert(name != NULL);
+ 	assert(pai != NULL);
+@@ -2049,8 +2053,50 @@ _gethtent(FILE **hostf, const char *name, const struct addrinfo *pai)
+ 	if (!*hostf && !(*hostf = fopen(_PATH_HOSTS, "r" )))
+ 		return (NULL);
+  again:
++	if (never_again == 1)
++		return (NULL);
+ 	if (!(p = fgets(hostbuf, sizeof hostbuf, *hostf)))
+ 		return (NULL);
++	if (strcmp(p, LFHFF_IDENTIFIER) == 0) {
++		/* This file is sorted */
++		fseek(*hostf, 0L, SEEK_END);
++		int record_count = (ftell(*hostf) - sizeof(LFHFF_IDENTIFIER)) / 256L;
++		fseek(*hostf, sizeof(LFHFF_IDENTIFIER), SEEK_SET);
++		int max = record_count;
++		int min = 0;
++		while (max != min) {
++			int pivot = (max + min) / 2;
++			fseek(*hostf, sizeof(LFHFF_IDENTIFIER) + pivot * 256L + 37L, SEEK_SET);
++			fread(hostbuf, 218, 1, *hostf);
++			p = hostbuf;
++			if ((cp = strpbrk(p, " \n")) == NULL) {
++				return (NULL);
++			}
++			*cp = '\0';
++			tname = p;
++			int comp = strcasecmp(name, tname);
++			if (comp < 0) {
++				max = pivot;
++			}
++			else if (comp > 0) {
++				if (min == pivot) {
++					fseek(*hostf, sizeof(LFHFF_IDENTIFIER) + max * 256L - 1L, SEEK_SET);
++					p = fgets(hostbuf, sizeof hostbuf, *hostf);
++					never_again = 1;
++					break;
++				}
++				else {
++					min = pivot;
++				}
++			}
++			else {
++				fseek(*hostf, sizeof(LFHFF_IDENTIFIER) + pivot * 256L - 1L, SEEK_SET);
++				p = fgets(hostbuf, sizeof hostbuf, *hostf);
++				never_again = 1;
++				break;
++			}
++		}
++	}
+ 	if (*p == '#')
+ 		goto again;
+ 	if (!(cp = strpbrk(p, "#\n")))
