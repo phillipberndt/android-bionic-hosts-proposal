@@ -1,5 +1,33 @@
+From b8e5632c9d23ddca81a2704517d0be1aaed9f98f Mon Sep 17 00:00:00 2001
+From: Phillip Berndt <phillip.berndt@googlemail.com>
+Date: Fri, 1 May 2015 13:25:15 +0200
+Subject: [PATCH] libc: Support for fast search in sorted /etc/hosts files
+
+The de-facto standard for ad-blocking on Android is to have a large
+hosts database with many 127.0.0.1 entries. Bionic currently does a
+linear, line-by-line search in this file for each DNS request, where
+each request for a domain that is not blocked needs O(N) string
+comparisons. If hosts files were sorted, one could instead do a binary
+search in O(log(N)) time.
+
+This commit adds binary search capabilities to libc and tries to
+establish a standard to mark sorted hosts files: Files that start with
+ "#LFHFFv1\n",    (short for lookup friendly hosts file format v1)
+without quotation marks, are assumed to be sorted in ascending
+strcasecmp() order. Comments and empty lines are still supported, but
+listing multiple domains on a single line is not, for obvious reasons.
+
+Experiments were carried out to determine how large the speed impact is
+(on a Samsung Galaxy S5 with 38.000 entries in /etc/hosts this change
+reduces a ~30ms lookup time to something in the order of microseconds).
+
+Change-Id: Ie234a94126cdfe8364695406ddba56ab21081da4
+---
+ libc/dns/net/getaddrinfo.c | 44 +++++++++++++++++++++++++++++++++++++++++++-
+ 1 file changed, 43 insertions(+), 1 deletion(-)
+
 diff --git a/libc/dns/net/getaddrinfo.c b/libc/dns/net/getaddrinfo.c
-index 2612d6a..f37e687 100644
+index 2612d6a..9a2ee5c 100644
 --- a/libc/dns/net/getaddrinfo.c
 +++ b/libc/dns/net/getaddrinfo.c
 @@ -112,6 +112,8 @@
@@ -15,20 +43,30 @@ index 2612d6a..f37e687 100644
  	const char *addr;
  	char hostbuf[8*1024];
  
-+	int check_order = 1, is_ordered = 0, omax = 0, omin = 0, opivot = 0, ocmp = 0;
++	int check_order = 1, is_ordered = 0, omax = 0, omin = 0, opivot = 0, ocmp = 0, opivot_down = -1;
 +
  //	fprintf(stderr, "_gethtent() name = '%s'\n", name);
  	assert(name != NULL);
  	assert(pai != NULL);
-@@ -2049,8 +2053,24 @@ _gethtent(FILE **hostf, const char *name, const struct addrinfo *pai)
+@@ -2049,8 +2053,34 @@ _gethtent(FILE **hostf, const char *name, const struct addrinfo *pai)
  	if (!*hostf && !(*hostf = fopen(_PATH_HOSTS, "r" )))
  		return (NULL);
   again:
 +	if (is_ordered) {
-+		fseek(*hostf, opivot, SEEK_SET);
-+		fgets(hostbuf, sizeof hostbuf, *hostf);
++		int diff = opivot > 255 ? 255 : opivot;
++		fseek(*hostf, opivot - diff, SEEK_SET);
++		fread(hostbuf, diff, 1, *hostf);
++		for(p = &hostbuf[diff]; *p != '\n' && p != hostbuf; p--);
++		if(p == hostbuf)
++			return (NULL);
++		p++;
++		if(opivot_down < 0)
++			opivot_down = opivot - diff + (p - hostbuf);
++		if(!fgets(hostbuf + diff, sizeof(hostbuf) - (p - hostbuf), *hostf))
++			return (NULL);
 +		opivot = ftell(*hostf);
 +	}
++	else
  	if (!(p = fgets(hostbuf, sizeof hostbuf, *hostf)))
  		return (NULL);
 +	if (check_order) {
@@ -45,7 +83,7 @@ index 2612d6a..f37e687 100644
  	if (*p == '#')
  		goto again;
  	if (!(cp = strpbrk(p, "#\n")))
-@@ -2073,9 +2093,22 @@ _gethtent(FILE **hostf, const char *name, const struct addrinfo *pai)
+@@ -2073,9 +2103,21 @@ _gethtent(FILE **hostf, const char *name, const struct addrinfo *pai)
  		if ((cp = strpbrk(cp, " \t")) != NULL)
  			*cp++ = '\0';
  //		fprintf(stderr, "\ttname = '%s'", tname);
@@ -54,18 +92,20 @@ index 2612d6a..f37e687 100644
  			goto found;
  	}
 +	if (is_ordered) {
++//		fprintf(stderr, "omin = %d, omax = %d, opivot = %d: %s\n", omin, omax, opivot, tname);
 +		if (omax == omin)
 +			return (NULL);
 +		if (ocmp < 0) {
-+			if (omax == opivot) {
-+				opivot = omin;
-+			}
-+			omax = opivot;
++			omax = opivot_down;
 +		}
 +		else
 +			omin = opivot;
 +		opivot = (omax + omin) / 2;
++		opivot_down = -1;
 +	}
  	goto again;
  
  found:
+-- 
+1.9.1
+

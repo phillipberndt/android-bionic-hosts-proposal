@@ -27,14 +27,25 @@ int main(int argc, char *argv[]) {
 	}
 	const char *name = argv[1];
 
-	int check_order = 1, is_ordered = 0, omax, omin, opivot, ocmp;
+	int check_order = 1, is_ordered = 0, omax, omin, opivot, opivot_down = -1, ocmp;
 
  again:
 	if (is_ordered) {
-		fseek(*hostf, opivot, SEEK_SET);
-		fgets(hostbuf, sizeof hostbuf, *hostf);
+		int diff = opivot > 255 ? 255 : opivot;
+		int eol;
+		fseek(*hostf, opivot - diff, SEEK_SET);
+		fread(hostbuf, diff, 1, *hostf);
+		for(p = &hostbuf[diff]; *p != '\n' && p != hostbuf; p--);
+		if(p == hostbuf)
+			return;
+		p++;
+		if(opivot_down < 0)
+			opivot_down = opivot - diff + (p - hostbuf);
+		if(!fgets(hostbuf + diff, sizeof(hostbuf) - (p - hostbuf), *hostf))
+			return;
 		opivot = ftell(*hostf);
 	}
+	else
 	if (!(p = fgets(hostbuf, sizeof hostbuf, *hostf)))
 		return;
 	if (check_order) {
@@ -43,7 +54,7 @@ int main(int argc, char *argv[]) {
 		if (is_ordered) {
 			fseek(*hostf, 0L, SEEK_END);
 			omax = ftell(*hostf);
-			omin = sizeof(LFHFF_IDENTIFIER);
+			omin = 0;
 			opivot = (omax + omin) / 2;
 			goto again;
 		}
@@ -74,17 +85,16 @@ int main(int argc, char *argv[]) {
 			goto found;
 	}
 	if (is_ordered) {
+//		fprintf(stderr, "omin = %d, omax = %d, opivot = %d: %s\n", omin, omax, opivot, tname);
 		if (omax == omin)
 			return;
 		if (ocmp < 0) {
-			if (omax == opivot) {
-				opivot = omin;
-			}
-			omax = opivot;
+			omax = opivot_down;
 		}
 		else
 			omin = opivot;
 		opivot = (omax + omin) / 2;
+		opivot_down = -1;
 	}
 	goto again;
 
