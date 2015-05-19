@@ -1,4 +1,4 @@
-From b8e5632c9d23ddca81a2704517d0be1aaed9f98f Mon Sep 17 00:00:00 2001
+From 537241302e90b3d71db1ecafb9afe6fbdf946cc2 Mon Sep 17 00:00:00 2001
 From: Phillip Berndt <phillip.berndt@googlemail.com>
 Date: Fri, 1 May 2015 13:25:15 +0200
 Subject: [PATCH] libc: Support for fast search in sorted /etc/hosts files
@@ -23,11 +23,11 @@ reduces a ~30ms lookup time to something in the order of microseconds).
 
 Change-Id: Ie234a94126cdfe8364695406ddba56ab21081da4
 ---
- libc/dns/net/getaddrinfo.c | 44 +++++++++++++++++++++++++++++++++++++++++++-
- 1 file changed, 43 insertions(+), 1 deletion(-)
+ libc/dns/net/getaddrinfo.c | 46 +++++++++++++++++++++++++++++++++++++++++++++-
+ 1 file changed, 45 insertions(+), 1 deletion(-)
 
 diff --git a/libc/dns/net/getaddrinfo.c b/libc/dns/net/getaddrinfo.c
-index 2612d6a..9a2ee5c 100644
+index 2612d6a..748cd76 100644
 --- a/libc/dns/net/getaddrinfo.c
 +++ b/libc/dns/net/getaddrinfo.c
 @@ -112,6 +112,8 @@
@@ -83,7 +83,7 @@ index 2612d6a..9a2ee5c 100644
  	if (*p == '#')
  		goto again;
  	if (!(cp = strpbrk(p, "#\n")))
-@@ -2073,9 +2103,21 @@ _gethtent(FILE **hostf, const char *name, const struct addrinfo *pai)
+@@ -2073,9 +2103,23 @@ _gethtent(FILE **hostf, const char *name, const struct addrinfo *pai)
  		if ((cp = strpbrk(cp, " \t")) != NULL)
  			*cp++ = '\0';
  //		fprintf(stderr, "\ttname = '%s'", tname);
@@ -92,7 +92,9 @@ index 2612d6a..9a2ee5c 100644
  			goto found;
  	}
 +	if (is_ordered) {
-+//		fprintf(stderr, "omin = %d, omax = %d, opivot = %d: %s\n", omin, omax, opivot, tname);
++//		fprintf(stderr, "omin = %d, omax = %d, opivot = %d, opivot_down: %d: %s\n", omin, omax, opivot, opivot_down, tname);
++		if (opivot_down == omax)
++			return (NULL);
 +		if (omax == omin)
 +			return (NULL);
 +		if (ocmp < 0) {

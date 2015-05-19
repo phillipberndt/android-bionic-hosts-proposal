@@ -85,9 +85,11 @@ int main(int argc, char *argv[]) {
 			goto found;
 	}
 	if (is_ordered) {
-//		fprintf(stderr, "omin = %d, omax = %d, opivot = %d: %s\n", omin, omax, opivot, tname);
+//		fprintf(stderr, "omin = %d, omax = %d, opivot = %d, opivot_down: %d: %s\n", omin, omax, opivot, opivot_down, tname);
+		if (opivot_down == omax)
+			return (NULL);
 		if (omax == omin)
-			return;
+			return (NULL);
 		if (ocmp < 0) {
 			omax = opivot_down;
 		}
