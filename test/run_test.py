@@ -5,18 +5,28 @@
 # (This checks if all hosts are properly resolved)
 #
 import multiprocessing
-import pexpect
+import subprocess
+import signal
+
+class Timeout(Exception):
+    pass
+
+def raise_timeout(*_):
+    raise Timeout()
 
 def action(data):
     ip, host = data
-    prog = pexpect.spawn("./a.out %s" % host, timeout=2)
+    signal.signal(signal.SIGALRM, raise_timeout)
+    signal.alarm(5)
     try:
-        output = prog.read()
-    except pexpect.TIMEOUT:
-        prog.kill()
+        proc = subprocess.Popen(["./a.out", host], stdout=subprocess.PIPE)
+        output = proc.stdout.read()
+    except Timeout:
         print "\033[31mTimeout while waiting for %s\033[0m" % host
         return
-    del prog
+    finally:
+        proc.kill()
+        signal.alarm(0)
     if ip == "-fail-":
         if output:
             print "Host %s found, this is an error!!" % (host)
