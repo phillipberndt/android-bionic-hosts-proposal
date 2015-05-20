@@ -1,4 +1,4 @@
-From 537241302e90b3d71db1ecafb9afe6fbdf946cc2 Mon Sep 17 00:00:00 2001
+From ebe4a24d66b50b1eb44b3e9fff6bb2258b80af75 Mon Sep 17 00:00:00 2001
 From: Phillip Berndt <phillip.berndt@googlemail.com>
 Date: Fri, 1 May 2015 13:25:15 +0200
 Subject: [PATCH] libc: Support for fast search in sorted /etc/hosts files
@@ -23,11 +23,11 @@ reduces a ~30ms lookup time to something in the order of microseconds).
 
 Change-Id: Ie234a94126cdfe8364695406ddba56ab21081da4
 ---
- libc/dns/net/getaddrinfo.c | 46 +++++++++++++++++++++++++++++++++++++++++++++-
- 1 file changed, 45 insertions(+), 1 deletion(-)
+ libc/dns/net/getaddrinfo.c | 53 +++++++++++++++++++++++++++++++++++++++++++++-
+ 1 file changed, 52 insertions(+), 1 deletion(-)
 
 diff --git a/libc/dns/net/getaddrinfo.c b/libc/dns/net/getaddrinfo.c
-index 2612d6a..748cd76 100644
+index 2612d6a..9120b73 100644
 --- a/libc/dns/net/getaddrinfo.c
 +++ b/libc/dns/net/getaddrinfo.c
 @@ -112,6 +112,8 @@
@@ -48,21 +48,28 @@ index 2612d6a..748cd76 100644
  //	fprintf(stderr, "_gethtent() name = '%s'\n", name);
  	assert(name != NULL);
  	assert(pai != NULL);
-@@ -2049,8 +2053,34 @@ _gethtent(FILE **hostf, const char *name, const struct addrinfo *pai)
+@@ -2049,8 +2053,41 @@ _gethtent(FILE **hostf, const char *name, const struct addrinfo *pai)
  	if (!*hostf && !(*hostf = fopen(_PATH_HOSTS, "r" )))
  		return (NULL);
   again:
 +	if (is_ordered) {
-+		int diff = opivot > 255 ? 255 : opivot;
-+		fseek(*hostf, opivot - diff, SEEK_SET);
-+		fread(hostbuf, diff, 1, *hostf);
-+		for(p = &hostbuf[diff]; *p != '\n' && p != hostbuf; p--);
-+		if(p == hostbuf)
-+			return (NULL);
++		int look_behind = 255;
++		int diff;
++		while (1) {
++			diff = opivot > look_behind ? look_behind : opivot;
++			int eol;
++			fseek(*hostf, opivot - diff, SEEK_SET);
++			fread(hostbuf, diff, 1, *hostf);
++			for(p = &hostbuf[diff]; *p != '\n' && p != hostbuf; p--);
++			if(p != hostbuf || diff == opivot || look_behind >= 2040)
++				break;
++			look_behind *= 2;
++			continue;
++		}
 +		p++;
 +		if(opivot_down < 0)
 +			opivot_down = opivot - diff + (p - hostbuf);
-+		if(!fgets(hostbuf + diff, sizeof(hostbuf) - (p - hostbuf), *hostf))
++		if(!fgets(hostbuf + diff, sizeof(hostbuf) - diff, *hostf))
 +			return (NULL);
 +		opivot = ftell(*hostf);
 +	}
@@ -83,7 +90,7 @@ index 2612d6a..748cd76 100644
  	if (*p == '#')
  		goto again;
  	if (!(cp = strpbrk(p, "#\n")))
-@@ -2073,9 +2103,23 @@ _gethtent(FILE **hostf, const char *name, const struct addrinfo *pai)
+@@ -2073,9 +2110,23 @@ _gethtent(FILE **hostf, const char *name, const struct addrinfo *pai)
  		if ((cp = strpbrk(cp, " \t")) != NULL)
  			*cp++ = '\0';
  //		fprintf(stderr, "\ttname = '%s'", tname);

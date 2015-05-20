@@ -48,4 +48,7 @@ if __name__ == '__main__':
         b = i[:n] + "-fiaidqwoodqwo"
         tests.append(("-fail-", b))
 
-    pool.map(action, tests)
+    try:
+        pool.map(action, tests)
+    except KeyboardInterrupt:
+        pool.terminate()

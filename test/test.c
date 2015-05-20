@@ -31,17 +31,23 @@ int main(int argc, char *argv[]) {
 
  again:
 	if (is_ordered) {
-		int diff = opivot > 255 ? 255 : opivot;
-		int eol;
-		fseek(*hostf, opivot - diff, SEEK_SET);
-		fread(hostbuf, diff, 1, *hostf);
-		for(p = &hostbuf[diff]; *p != '\n' && p != hostbuf; p--);
-		if(p == hostbuf)
-			return;
+		int look_behind = 255;
+		int diff;
+		while (1) {
+			diff = opivot > look_behind ? look_behind : opivot;
+			int eol;
+			fseek(*hostf, opivot - diff, SEEK_SET);
+			fread(hostbuf, diff, 1, *hostf);
+			for(p = &hostbuf[diff]; *p != '\n' && p != hostbuf; p--);
+			if(p != hostbuf || diff == opivot || look_behind >= 2040)
+				break;
+			look_behind *= 2;
+			continue;
+		}
 		p++;
 		if(opivot_down < 0)
 			opivot_down = opivot - diff + (p - hostbuf);
-		if(!fgets(hostbuf + diff, sizeof(hostbuf) - (p - hostbuf), *hostf))
+		if(!fgets(hostbuf + diff, sizeof(hostbuf) - diff, *hostf))
 			return;
 		opivot = ftell(*hostf);
 	}

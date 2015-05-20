@@ -14,6 +14,16 @@ file and patch libc to do a binary search (hence, O(log(n)) lookup) instead.
 * From apps that alter the file, write `/etc/hosts` files sorted in
   `strcasecmp` order and prepend them with `#LFHFFv1\n`.
 
+## Testing / Validation
+The patch has been tested on a live system and using the code from the test
+directory on a large hosts file with
+
+* overly long lines
+* lots of comments/empty lines
+* queries against domains that lie in between each two other domains (in the
+  sort order)
+* unsorted files with the header (doesn't work, but also doesn't loop forever)
+
 ## Rationale
 It is obvious why replacing the O(n) lookup with a O(log(n)) one is beneficial
 for large data sets, especially if that upper bound is often reached by lookups
