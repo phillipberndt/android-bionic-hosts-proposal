@@ -7,30 +7,37 @@ lookup in this file for each DNS query. Here, it is proposed to sort the hosts
 file and patch libc to do a binary search (hence, O(log(n)) lookup) instead.
 
 ## Proposal
-* Patch Bionic/libc to do a binary search through `/etc/hosts` files if they
-  are sorted. Perform the binary search using the position in the file as a
-  pivot rather than line numbers. The proposed patch for this is
-  [variable-record-size-lookup.patch](patches/variable-record-size-lookup.patch).
-* From apps that alter the file, write `/etc/hosts` files sorted in
-  `strcasecmp` order and prepend them with `#LFHFFv1\n`.
+* Patch Bionic/libc to maintain a sorted cache of the entries in `/etc/hosts`.
+  Prefer lookups in that cache if it exists and is up to date. Elsewise,
+  perform lookups as before.
+
+  The patch is in the `cached_variant` subdirectory.
 
 ## Testing / Validation
-The patch has been tested on a live system and using the code from the test
+The patch has been tested on a live cm-12.1 system and using the code from the `cached_variant`
 directory on a large hosts file with
 
 * overly long lines
 * lots of comments/empty lines
 * queries against domains that lie in between each two other domains (in the
   sort order)
-* unsorted files with the header (doesn't work, but also doesn't loop forever)
+
+Also, in the same directory, there is a python script to lookup all entries of
+a hosts file (that must be extracted from an android device before).
 
 ## Rationale
 It is obvious why replacing the O(n) lookup with a O(log(n)) one is beneficial
 for large data sets, especially if that upper bound is often reached by lookups
 for non-iternal, or non-blocked, hosts. What is not is if the speed impact
-justifies the expense of having an additional patch to maintain and whether
-one should prefer over this a file format that is essentially binary, and
-therefore faster to process.
+justifies the expense of having an additional patch to maintain.
+
+<div style="background: #f5fff5; border: 1px solid #cfc; margin: 10px; padding: 10px">
+The first approach to this defined a file format for sorted hosts lists and
+made users responsible for creating a file in said format. The measurements
+below were taken using this implementation. It was later found that it is far
+more practical to create this sorted version of the file on the fly and cache
+it. The time measurements are still accurate.
+</div>
 
 The patch
 [time-measurement-logcat.patch](patches/time-measurement-logcat.patch) has been
