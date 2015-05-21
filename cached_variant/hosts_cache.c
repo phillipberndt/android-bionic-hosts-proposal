@@ -31,7 +31,7 @@ struct _hosts_entry {
 };
 
 static int _hosts_cmp(const void *a, const void *b) {
-	return strcasecmp(((struct _hosts_entry *)a)->hostname, ((struct _hosts_entry *)b)->hostname);
+	return strncasecmp(((struct _hosts_entry *)a)->hostname, ((struct _hosts_entry *)b)->hostname, sizeof(((struct _hosts_entry *)a)->hostname));
 }
 
 /* Taken from bionic */
@@ -85,6 +85,11 @@ static int _create_hosts_cache() {
 	unsigned int hosts_list_N = 1024;
 	unsigned int hosts_list_n = 0;
 	struct _hosts_entry *hosts_list = malloc(sizeof(struct _hosts_entry) * 1024);
+	if (!hosts_list) {
+		fclose(hostsf);
+		fclose(cachef);
+		return 1;
+	}
 
 	while (!feof(hostsf)) {
 		if ((p = fgets(buf, sizeof buf, hostsf)) == NULL)

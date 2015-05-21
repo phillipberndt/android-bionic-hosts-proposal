@@ -1,4 +1,4 @@
-From 4326109756f15e999e261492bf505a84cd9898b0 Mon Sep 17 00:00:00 2001
+From 86714d2bd02d0f97e7738e4baf582d8cc1fd9579 Mon Sep 17 00:00:00 2001
 From: Phillip Berndt <phillip.berndt@googlemail.com>
 Date: Thu, 21 May 2015 07:49:23 +0200
 Subject: [PATCH] libc: Cache large /etc/hosts files
@@ -26,8 +26,8 @@ using the old code.
 Change-Id: Ie234a94126cdfe8364695406ddba56ab21081da4
 ---
  libc/dns/net/getaddrinfo.c |  10 ++
- libc/dns/net/hosts_cache.c | 229 +++++++++++++++++++++++++++++++++++++++++++++
- 2 files changed, 239 insertions(+)
+ libc/dns/net/hosts_cache.c | 234 +++++++++++++++++++++++++++++++++++++++++++++
+ 2 files changed, 244 insertions(+)
  create mode 100644 libc/dns/net/hosts_cache.c
 
 diff --git a/libc/dns/net/getaddrinfo.c b/libc/dns/net/getaddrinfo.c
@@ -60,10 +60,10 @@ index 2612d6a..9007b25 100644
  	cur = &sentinel;
 diff --git a/libc/dns/net/hosts_cache.c b/libc/dns/net/hosts_cache.c
 new file mode 100644
-index 0000000..2375161
+index 0000000..54343db
 --- /dev/null
 +++ b/libc/dns/net/hosts_cache.c
-@@ -0,0 +1,229 @@
+@@ -0,0 +1,234 @@
 +/*
 + * Fast lookup cache for /etc/hosts files
 + *
@@ -97,7 +97,7 @@ index 0000000..2375161
 +};
 +
 +static int _hosts_cmp(const void *a, const void *b) {
-+	return strcasecmp(((struct _hosts_entry *)a)->hostname, ((struct _hosts_entry *)b)->hostname);
++	return strncasecmp(((struct _hosts_entry *)a)->hostname, ((struct _hosts_entry *)b)->hostname, sizeof(((struct _hosts_entry *)a)->hostname));
 +}
 +
 +/* Taken from bionic */
@@ -151,6 +151,11 @@ index 0000000..2375161
 +	unsigned int hosts_list_N = 1024;
 +	unsigned int hosts_list_n = 0;
 +	struct _hosts_entry *hosts_list = malloc(sizeof(struct _hosts_entry) * 1024);
++	if (!hosts_list) {
++		fclose(hostsf);
++		fclose(cachef);
++		return 1;
++	}
 +
 +	while (!feof(hostsf)) {
 +		if ((p = fgets(buf, sizeof buf, hostsf)) == NULL)
