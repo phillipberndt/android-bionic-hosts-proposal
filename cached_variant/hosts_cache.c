@@ -63,11 +63,11 @@ static int _create_hosts_cache() {
 		fclose(hostsf);
 		return 0;
 	}
-	if (hosts_stat.st_size < 1024 * 512) {
+	if (hosts_stat.st_size < 1024 * 100) {
 		fclose(hostsf);
 		return 1;
 	}
-	if (flock(fileno(hostsf), LOCK_EX)) {
+	if (flock(fileno(hostsf), LOCK_EX) < 0) {
 		fclose(hostsf);
 		return 1;
 	}

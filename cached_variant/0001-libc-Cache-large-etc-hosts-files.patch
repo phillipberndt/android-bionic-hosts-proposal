@@ -1,4 +1,4 @@
-From 7d0ecb9879ebfe4526cf76ffcd4f27e1c3c3a27c Mon Sep 17 00:00:00 2001
+From 4326109756f15e999e261492bf505a84cd9898b0 Mon Sep 17 00:00:00 2001
 From: Phillip Berndt <phillip.berndt@googlemail.com>
 Date: Thu, 21 May 2015 07:49:23 +0200
 Subject: [PATCH] libc: Cache large /etc/hosts files
@@ -10,7 +10,7 @@ each request for a domain that is not blocked needs O(N) string
 comparisons. If hosts files were sorted, one could instead do a binary
 search in O(log(N)) time.
 
-This commit adds a cache for hosts files that are >=512 KiB large in
+This commit adds a cache for hosts files that are >=100 KiB large in
 /data/misc/net/hosts.cache. The cache uses a list of
 
  struct _hosts_entry { char ip[40]; char hostname[255]; },
@@ -60,7 +60,7 @@ index 2612d6a..9007b25 100644
  	cur = &sentinel;
 diff --git a/libc/dns/net/hosts_cache.c b/libc/dns/net/hosts_cache.c
 new file mode 100644
-index 0000000..ea2f577
+index 0000000..2375161
 --- /dev/null
 +++ b/libc/dns/net/hosts_cache.c
 @@ -0,0 +1,229 @@
@@ -129,11 +129,11 @@ index 0000000..ea2f577
 +		fclose(hostsf);
 +		return 0;
 +	}
-+	if (hosts_stat.st_size < 1024 * 512) {
++	if (hosts_stat.st_size < 1024 * 100) {
 +		fclose(hostsf);
 +		return 1;
 +	}
-+	if (flock(fileno(hostsf), LOCK_EX)) {
++	if (flock(fileno(hostsf), LOCK_EX) < 0) {
 +		fclose(hostsf);
 +		return 1;
 +	}
