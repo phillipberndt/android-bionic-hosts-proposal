@@ -1,4 +1,4 @@
-# Proposal for a Lookup-friendly hosts file format
+# Proposal to speed up /etc/hosts lookup
 
 ## Synopsis
 Android's `/etc/hosts` files can become quite large on some systems,
