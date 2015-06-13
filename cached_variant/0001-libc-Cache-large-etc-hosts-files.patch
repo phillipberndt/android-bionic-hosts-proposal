@@ -1,4 +1,4 @@
-From 28a7ff113a5cf49906b48bf8ceb477db8b52145b Mon Sep 17 00:00:00 2001
+From d840eb1a9a20912c5a589a856e899c6eecd37d8f Mon Sep 17 00:00:00 2001
 From: Phillip Berndt <phillip.berndt@googlemail.com>
 Date: Thu, 21 May 2015 07:49:23 +0200
 Subject: [PATCH] libc: Cache large /etc/hosts files
@@ -61,7 +61,7 @@ index 2612d6a..1037aaf 100644
  	cur = &sentinel;
 diff --git a/libc/dns/net/hosts_cache.c b/libc/dns/net/hosts_cache.c
 new file mode 100644
-index 0000000..3158c84
+index 0000000..74c0afe
 --- /dev/null
 +++ b/libc/dns/net/hosts_cache.c
 @@ -0,0 +1,252 @@
@@ -250,7 +250,7 @@ index 0000000..3158c84
 +
 +	struct stat cache_stat;
 +	fstat(cachef, &cache_stat);
-+	unsigned int nrecords = cache_stat.st_size / sizeof(struct _hosts_entry);
++	int nrecords = cache_stat.st_size / sizeof(struct _hosts_entry);
 +
 +	struct _hosts_entry *cache = mmap(NULL, cache_stat.st_size, PROT_READ, MAP_SHARED,
 +			cachef, 0);
@@ -260,10 +260,10 @@ index 0000000..3158c84
 +		return 1;
 +	}
 +
-+	unsigned int min = 0, max = nrecords;
++	int min = 0, max = nrecords;
 +	int found = -1;
 +	while (min < max) {
-+		unsigned int pivot = (max + min) / 2;
++		int pivot = (max + min) / 2;
 +
 +		int cmp = strcasecmp(cache[pivot].hostname, name);
 +		if (cmp > 0)

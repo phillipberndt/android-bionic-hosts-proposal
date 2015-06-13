@@ -183,7 +183,7 @@ int _cached_hosts_lookup(const char *name, const struct addrinfo *pai,
 
 	struct stat cache_stat;
 	fstat(cachef, &cache_stat);
-	unsigned int nrecords = cache_stat.st_size / sizeof(struct _hosts_entry);
+	int nrecords = cache_stat.st_size / sizeof(struct _hosts_entry);
 
 	struct _hosts_entry *cache = mmap(NULL, cache_stat.st_size, PROT_READ, MAP_SHARED,
 			cachef, 0);
@@ -193,10 +193,10 @@ int _cached_hosts_lookup(const char *name, const struct addrinfo *pai,
 		return 1;
 	}
 
-	unsigned int min = 0, max = nrecords;
+	int min = 0, max = nrecords;
 	int found = -1;
 	while (min < max) {
-		unsigned int pivot = (max + min) / 2;
+		int pivot = (max + min) / 2;
 
 		int cmp = strcasecmp(cache[pivot].hostname, name);
 		if (cmp > 0)
