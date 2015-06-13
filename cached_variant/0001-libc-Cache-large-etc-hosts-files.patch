@@ -1,4 +1,4 @@
-From c37145b8cb713c529f71d2a92724bfa7445e1c76 Mon Sep 17 00:00:00 2001
+From 28a7ff113a5cf49906b48bf8ceb477db8b52145b Mon Sep 17 00:00:00 2001
 From: Phillip Berndt <phillip.berndt@googlemail.com>
 Date: Thu, 21 May 2015 07:49:23 +0200
 Subject: [PATCH] libc: Cache large /etc/hosts files
@@ -31,14 +31,14 @@ Change-Id: Ie234a94126cdfe8364695406ddba56ab21081da4
  create mode 100644 libc/dns/net/hosts_cache.c
 
 diff --git a/libc/dns/net/getaddrinfo.c b/libc/dns/net/getaddrinfo.c
-index 2612d6a..fc12ee4 100644
+index 2612d6a..1037aaf 100644
 --- a/libc/dns/net/getaddrinfo.c
 +++ b/libc/dns/net/getaddrinfo.c
 @@ -311,6 +311,9 @@ do { 								\
  #define MATCH(x, y, w) 							\
  	((x) == (y) || (/*CONSTCOND*/(w) && ((x) == ANY || (y) == ANY)))
  
-+extern int _cached_hosts_lookup(const char *name,
++int _cached_hosts_lookup(const char *name,
 +	const struct addrinfo *pai, struct addrinfo **retval);
 +
  const char *
