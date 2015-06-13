@@ -2,26 +2,29 @@
  * Fast lookup cache for /etc/hosts files
  *
  */
-#include <stdlib.h>
 #include <fcntl.h>
-#include <unistd.h>
+#include <netdb.h>
 #include <stdio.h>
-#include <sys/file.h>
-#include <sys/types.h>
-#include <sys/stat.h>
+#include <stdlib.h>
 #include <string.h>
 #include <strings.h>
-#include <utime.h>
-#include <sys/types.h>
+#include <sys/file.h>
+#include <sys/mman.h>
 #include <sys/socket.h>
-#include <netdb.h>
+#include <sys/stat.h>
+#include <sys/types.h>
+#include <sys/types.h>
+#include <unistd.h>
+#include <utime.h>
 
 #ifdef _HOSTS_CACHE_TEST
 	#define HOSTS_FILE "hosts"
 	#define HOSTS_CACHE_FILE "hosts.cache"
 #else
 	#define HOSTS_FILE "/system/etc/hosts"
-	/* This is a location that netd (which actually calls this) has SELinux permissions to write to: */
+	/* This is a location that netd (which actually calls this) has
+	 * SELinux permissions to write to:
+	 */
 	#define HOSTS_CACHE_FILE "/data/misc/net/hosts.cache"
 #endif
 
@@ -31,11 +34,14 @@ struct _hosts_entry {
 };
 
 static int _hosts_cmp(const void *a, const void *b) {
-	return strncasecmp(((struct _hosts_entry *)a)->hostname, ((struct _hosts_entry *)b)->hostname, sizeof(((struct _hosts_entry *)a)->hostname));
+	return strncasecmp(((struct _hosts_entry *)a)->hostname,
+		((struct _hosts_entry *)b)->hostname,
+		sizeof(((struct _hosts_entry *)a)->hostname));
 }
 
 /* Taken from bionic */
-static int get_canonname(const struct addrinfo *pai, struct addrinfo *ai, const char *str) {
+static int get_canonname(const struct addrinfo *pai, struct addrinfo *ai,
+		const char *str) {
 	if ((pai->ai_flags & AI_CANONNAME) != 0) {
 		ai->ai_canonname = strdup(str);
 		if (ai->ai_canonname == NULL)
@@ -59,7 +65,8 @@ static int _create_hosts_cache() {
 		fclose(hostsf);
 		return 1;
 	}
-	if (stat(HOSTS_CACHE_FILE, &cache_stat) == 0 && cache_stat.st_mtime == hosts_stat.st_mtime) {
+	if (stat(HOSTS_CACHE_FILE, &cache_stat) == 0 &&
+			cache_stat.st_mtime == hosts_stat.st_mtime) {
 		fclose(hostsf);
 		return 0;
 	}
@@ -71,7 +78,8 @@ static int _create_hosts_cache() {
 		fclose(hostsf);
 		return 1;
 	}
-	if (stat(HOSTS_CACHE_FILE, &cache_stat) == 0 && cache_stat.st_mtime == hosts_stat.st_mtime) {
+	if (stat(HOSTS_CACHE_FILE, &cache_stat) == 0 &&
+			cache_stat.st_mtime == hosts_stat.st_mtime) {
 		fclose(hostsf);
 		return 0;
 	}
@@ -84,7 +92,8 @@ static int _create_hosts_cache() {
 	// Create list of host file entries
 	unsigned int hosts_list_N = 1024;
 	unsigned int hosts_list_n = 0;
-	struct _hosts_entry *hosts_list = malloc(sizeof(struct _hosts_entry) * 1024);
+	struct _hosts_entry *hosts_list =
+		malloc(sizeof(struct _hosts_entry) * 1024);
 	if (!hosts_list) {
 		fclose(hostsf);
 		fclose(cachef);
@@ -118,7 +127,8 @@ static int _create_hosts_cache() {
 
 			if (hosts_list_n >= hosts_list_N) {
 				hosts_list_N += 10000;
-				hosts_list = realloc(hosts_list, sizeof(struct _hosts_entry) * hosts_list_N);
+				hosts_list = realloc(hosts_list,
+						sizeof(struct _hosts_entry) * hosts_list_N);
 				if (!hosts_list) {
 					fclose(hostsf);
 					fclose(cachef);
@@ -127,7 +137,8 @@ static int _create_hosts_cache() {
 			}
 			memset(&hosts_list[hosts_list_n], 0, sizeof(struct _hosts_entry));
 			strncpy(hosts_list[hosts_list_n].ip, ip, sizeof(hosts_list->ip));
-			strncpy(hosts_list[hosts_list_n].hostname, host, sizeof(hosts_list->hostname));
+			strncpy(hosts_list[hosts_list_n].hostname, host,
+					sizeof(hosts_list->hostname));
 			hosts_list_n++;
 		}
 	}
@@ -136,9 +147,11 @@ static int _create_hosts_cache() {
 	qsort(hosts_list, hosts_list_n, sizeof(struct _hosts_entry), _hosts_cmp);
 
 	// Write cache file
-	if (fwrite(hosts_list, sizeof(struct _hosts_entry), hosts_list_n, cachef) == hosts_list_n) {
+	if (fwrite(hosts_list, sizeof(struct _hosts_entry), hosts_list_n, cachef)
+			== hosts_list_n) {
 		// Set cache file mtime to hosts file mtime
-		struct timespec times[2] = { { hosts_stat.st_mtime, 0 },  { hosts_stat.st_mtime, 0 } };
+		struct timespec times[2] = { { hosts_stat.st_mtime, 0 },
+			{ hosts_stat.st_mtime, 0 } };
 		fflush(cachef);
 		futimens(fileno(cachef), times);
 	}
@@ -148,35 +161,44 @@ static int _create_hosts_cache() {
 	free(hosts_list);
 	fclose(hostsf);
 
-	return 2;
+	return 0;
 }
 
 /**
- * _cached_hosts_lookup: Lookup name using hints pai, store result(s) pointer into retval, and
- * return
+ * _cached_hosts_lookup: Lookup name using hints pai, store result(s) pointer
+ * into retval, and return
  *  1 -> cache failure, continue with default hosts file handler
- *  0 -> cache success, but retval might still not contain a result (it is set to NULL though)
+ *  0 -> cache success, but retval might still not contain a result
+ *       (it is set to NULL though)
  */
-int _cached_hosts_lookup(const char *name, const struct addrinfo *pai, struct addrinfo **retval) {
+int _cached_hosts_lookup(const char *name, const struct addrinfo *pai,
+		struct addrinfo **retval) {
 	if (_create_hosts_cache() == 1)
 		return 1;
 
-	FILE *cachef = fopen(HOSTS_CACHE_FILE, "r");
-	flock(fileno(cachef), LOCK_SH);
+	int cachef = open(HOSTS_CACHE_FILE, O_RDONLY);
+	if(cachef < 0)
+		return 1;
+	flock(cachef, LOCK_SH);
+
 	struct stat cache_stat;
-	fstat(fileno(cachef), &cache_stat);
+	fstat(cachef, &cache_stat);
 	unsigned int nrecords = cache_stat.st_size / sizeof(struct _hosts_entry);
 
+	struct _hosts_entry *cache = mmap(NULL, cache_stat.st_size, PROT_READ, MAP_SHARED,
+			cachef, 0);
+
+	if(cache == MAP_FAILED) {
+		close(cachef);
+		return 1;
+	}
+
 	unsigned int min = 0, max = nrecords;
-	struct _hosts_entry host;
 	int found = -1;
 	while (min < max) {
 		unsigned int pivot = (max + min) / 2;
-		fseek(cachef, pivot * sizeof(struct _hosts_entry), SEEK_SET);
-		fread(&host, sizeof(struct _hosts_entry), 1, cachef);
 
-		int cmp = strcasecmp(host.hostname, name);
-		//printf("cmp %d (min=%d max=%d) %s\n", pivot, min, max, host.hostname);
+		int cmp = strcasecmp(cache[pivot].hostname, name);
 		if (cmp > 0)
 			max = pivot;
 		else if (cmp < 0) {
@@ -192,33 +214,28 @@ int _cached_hosts_lookup(const char *name, const struct addrinfo *pai, struct ad
 	*retval = NULL;
 	if (found >= 0) {
 		while (found > 0) {
-			fseek(cachef, (found - 1) * sizeof(struct _hosts_entry), SEEK_SET);
-			fread(&host, sizeof(struct _hosts_entry), 1, cachef);
-			if (strcasecmp(host.hostname, name) == 0) {
+			if (strcasecmp(cache[found - 1].hostname, name) == 0) {
 				found--;
 			}
 			else break;
 		}
 
-		for (;; found++) {
-			fseek(cachef, found * sizeof(struct _hosts_entry), SEEK_SET);
-			if (fread(&host, sizeof(struct _hosts_entry), 1, cachef) < 1)
-				break;
-			if (strcasecmp(host.hostname, name) != 0)
+		for (; found < nrecords; found++) {
+			if (strcasecmp(cache[found].hostname, name) != 0)
 				break;
 
 			int error;
 			struct addrinfo hints, *res0, *res;
 			hints = *pai;
 			hints.ai_flags = AI_NUMERICHOST;
-			error = getaddrinfo(host.ip, NULL, &hints, &res0);
+			error = getaddrinfo(cache[found].ip, NULL, &hints, &res0);
 			if (error)
 				continue;
 			for (res = res0; res; res = res->ai_next) {
 				res->ai_flags = pai->ai_flags;
 
 				if (pai->ai_flags & AI_CANONNAME) {
-					if (get_canonname(pai, res, host.hostname) != 0) {
+					if (get_canonname(pai, res, cache[found].hostname) != 0) {
 						freeaddrinfo(res0);
 						continue;
 					}
@@ -229,6 +246,7 @@ int _cached_hosts_lookup(const char *name, const struct addrinfo *pai, struct ad
 		}
 	}
 
-	fclose(cachef);
+	munmap(cache, cache_stat.st_size);
+	close(cachef);
 	return 0;
 }
