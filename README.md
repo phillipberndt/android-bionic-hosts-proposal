@@ -1,5 +1,7 @@
 # Proposal to speed up /etc/hosts lookup
 
+**The changes proposed here were included in Cyanogenmod [on Aug 4, 2016](http://review.cyanogenmod.org/#/c/150364/).**
+
 ## Synopsis
 Android's `/etc/hosts` files can become quite large on some systems,
 with a number in the order of 10,000s of entries. Android's libc does a linear
